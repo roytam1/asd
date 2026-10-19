@@ -488,25 +488,25 @@ void encode(unsigned long hash_level_deep,
   for (l1=0; l1<E_LITERAL_NUM_CODES; l1++)
     {
       e_literal_count[l1]=1;
-      e_literal_high_tree[l1]=NULL;
-      e_literal_low_tree[l1]=NULL;
+      e_literal_high_tree[l1]=0;
+      e_literal_low_tree[l1]=0;
     }
   for (l1=0; l1<E_OFFSET_NUM_CODES; l1++)
     {
       e_offset_count[l1]=1;
-      e_offset_high_tree[l1]=NULL;
-      e_offset_low_tree[l1]=NULL;
+      e_offset_high_tree[l1]=0;
+      e_offset_low_tree[l1]=0;
     }
   for (l1 = 0; l1 < (E_OFFSET_NUM_CODES*2); l1++)
     {
-      e_offset_from_tree[l1] = NULL;
+      e_offset_from_tree[l1] = 0;
     }
   for (l1 = 0; l1<(E_LITERAL_NUM_CODES*2); l1++)
     {
-      e_literal_from_tree[l1]=NULL;
+      e_literal_from_tree[l1]=0;
     }
 
-  printf("\n100% left to compress. ");
+  printf("\n100%% left to compress. ");
 
 
   /* write header.. */
@@ -648,7 +648,10 @@ void encode(unsigned long hash_level_deep,
 		{
 		  e_fstatus=0;
 		  _gotoxy(0,_wherey());
-		  printf("%ld %% left to compress.                      ",(100-(e_count/(e_fsize/100))) );
+		  if (e_fsize>100)
+		    printf("%ld %% left to compress.                      ",(100-(e_count/(e_fsize/100))) );
+		  else
+		    printf("100 %% left to compress.                      ");
 		}
 	      if (left_in_window<1) break;
 	    }
@@ -702,7 +705,7 @@ void encode(unsigned long hash_level_deep,
   fflush(infile);
   //fflush((FILE*)outfile);
 
-  tc(YELLOW);printf("þ ");tc(NORMAL);
+  tc(YELLOW);printf("- ");tc(NORMAL);
   printf("infile:%ld     outfile:%ld    ",filelength(fileno(infile)),GetOutputBitFilePos(outfile)+1);
 
   d1=(filelength(fileno(infile)));

@@ -2,6 +2,8 @@
 #
 #    ASD Archiver Makefile for Borland C++ 5.0
 #
+#    For Microsoft Visual C++ 6.0 use build.bat instead
+#
 #################################################################
 
 all:    asd.exe unasd.exe

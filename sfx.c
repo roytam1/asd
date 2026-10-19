@@ -105,7 +105,7 @@ int file_exist(char*);
 
 
 
-//don´t forget to free mem too later..
+//don't forget to free mem too later..
 
 
 
@@ -191,42 +191,60 @@ int check_file(char *filename)
 {
   int result;
   char *temp_filename;
+  char *asd_filename;
+  int c1,c2,c3;
+
   result=0;
   temp_filename = (char*) malloc ((sizeof(char)*(strlen(filename)+10)) );
   temp_filename[0]='\0';
   strcpy(temp_filename,filename);
+
+  /* room for the name + ".asd" + null (the name of the caller must not be changed) */
+  asd_filename = (char*) malloc ((sizeof(char)*(strlen(filename)+6)) );
+  strcpy(asd_filename,filename);
   
   if ((infile = fopen(filename,"rb"))==NULL) 
     {
       result=1;
-      filename = (char*) realloc(filename,(strlen(filename)+6) * sizeof(char));
-      strcat(filename,".asd");
-      if ((infile = fopen(filename,"rb"))==NULL) 
+      strcat(asd_filename,".asd");
+      if ((infile = fopen(asd_filename,"rb"))==NULL) 
 	{
-	  tc(RED);printf("File [%s] or [%s.asd] does not exist !\n",temp_filename,temp_filename);tc(NORMAL);
-	  fclose(infile);
-	  free_mem(temp_filename);
-	  exit(EXIT_FAILURE);
+ 	  tc(RED);printf("File [%s] or [%s.asd] does not exist !\n",temp_filename,temp_filename);tc(NORMAL);
+ 	  free_mem(asd_filename);
+ 	  free_mem(temp_filename);
+ 	  exit(EXIT_FAILURE);
 	}
     }
+  free_mem(asd_filename);
 
-  if ( (_getc(infile)!='A') | (_getc(infile)!='S') | (_getc(infile)!='D')  )
+  /* note: the chars must be read one by one, the order of the
+   * evaluation of the operands is not the same in every compiler */
+  c1=_getc(infile);
+  c2=_getc(infile);
+  c3=_getc(infile);
+
+  if ( (c1!='A') | (c2!='S') | (c3!='D')  )
     {
       /* if file is exe file */
       if  (filelength(fileno(infile)) > sfx_data_size)
 	{
 	  fseek(infile,sfx_data_size,SEEK_SET);
-	  if ( (_getc(infile)=='A') && (_getc(infile)=='S') && (_getc(infile)=='D')  )
+	  c1=_getc(infile);
+	  c2=_getc(infile);
+	  c3=_getc(infile);
+	  if ( (c1=='A') && (c2=='S') && (c3=='D')  )
 	    {
 	      asd_version[0] = _getc(infile);
 	      asd_version[2] = _getc(infile);
-	      if ( (asd_version[0] != '0') | ((asd_version[2] != '1') & (asd_version[2] != '2')) | (_getc(infile)!=26)  )
+	      c1=_getc(infile);
+	      if ( (asd_version[0] != '0') | ((asd_version[2] != '1') & (asd_version[2] != '2')) | (c1!=26)  )
 		{
 		  tc(RED);printf("[%s] is NOT an ASD 0.1.x archive, please download latest ASD archiver and try again !\n",filename);tc(NORMAL);
 		  fclose(infile);
 		  free_mem(temp_filename);
 		  exit(EXIT_FAILURE);
 		}
+	      free_mem(temp_filename);
 	      return(result);
 	    }
 	}
@@ -238,7 +256,8 @@ int check_file(char *filename)
 
   asd_version[0] = _getc(infile);
   asd_version[2] = _getc(infile);
-  if ( (asd_version[0] != '0') | ((asd_version[2] != '1') & (asd_version[2] != '2') ) | (_getc(infile)!=26)  )
+  c1=_getc(infile);
+  if ( (asd_version[0] != '0') | ((asd_version[2] != '1') & (asd_version[2] != '2') ) | (c1!=26)  )
     {
       tc(RED);printf("[%s] is NOT an ASD 0.1.x or 0.2.x archive, please download latest ASD archiver and try again !\n ",filename);tc(NORMAL);
       fclose(infile);
@@ -248,6 +267,7 @@ int check_file(char *filename)
   free_mem(temp_filename);
   return(result);
 }
+
 
 
 
@@ -430,7 +450,7 @@ int extract(char *filename)
   InputBits(bit_infile,8);
   InputBits(bit_infile,8);
 
-  tc(YELLOW);printf("þ ");tc(NORMAL);
+  tc(YELLOW);printf("- ");tc(NORMAL);
   if (testa==1)
     printf("\rTesting archive: ");
   else
@@ -555,27 +575,27 @@ int extract(char *filename)
         /* set data so no errors will appear in the future.. */
       for (l1=0; l1<(unsigned)(LITERAL_NUM_CODES); l1++)
 	{
-	  literal_high_tree[l1]=NULL;
-	  literal_low_tree[l1]=NULL;
+	  literal_high_tree[l1]=0;
+	  literal_low_tree[l1]=0;
 	  /* x2 */
-	  literal_count[l1]=NULL;
-	  literal_from_tree[l1]=NULL;
-	  literal_counted_tree[l1]=NULL;
-	  literal_count[l1*2]=NULL;
-	  literal_from_tree[l1*2]=NULL;
-	  literal_counted_tree[l1*2]=NULL;
+	  literal_count[l1]=0;
+	  literal_from_tree[l1]=0;
+	  literal_counted_tree[l1]=0;
+	  literal_count[l1*2]=0;
+	  literal_from_tree[l1*2]=0;
+	  literal_counted_tree[l1*2]=0;
 	}
       for (l1=0; l1<((unsigned)OFFSET_NUM_CODES); l1++)
 	{
-	  offset_high_tree[l1]=NULL;
-	  offset_low_tree[l1]=NULL;
+	  offset_high_tree[l1]=0;
+	  offset_low_tree[l1]=0;
 	  /* x2 */
-	  offset_count[l1]=NULL;
-	  offset_from_tree[l1]=NULL;
-	  offset_counted_tree[l1]=NULL;
-	  offset_count[l1*2]=NULL;
-	  offset_from_tree[l1*2]=NULL;
-	  offset_counted_tree[l1*2]=NULL;
+	  offset_count[l1]=0;
+	  offset_from_tree[l1]=0;
+	  offset_counted_tree[l1]=0;
+	  offset_count[l1*2]=0;
+	  offset_from_tree[l1*2]=0;
+	  offset_counted_tree[l1*2]=0;
 	}
 
       /* init huffman */
@@ -686,7 +706,7 @@ int extract(char *filename)
 
   if (errors==0)
     {
-      tc(YELLOW);printf("þ ");tc(NORMAL);printf("All files OK !\n");tc(NORMAL);
+      tc(YELLOW);printf("- ");tc(NORMAL);printf("All files OK !\n");tc(NORMAL);
     }
   else
     {

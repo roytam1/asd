@@ -1,15 +1,19 @@
 #define __COLOR__
 
-//#define __WINDOWS__      
-//or
+//select the target platform, windows is the default
 //#define __DOS__
 //or
 //#define __UNIX__
+#if !defined(__DOS__) && !defined(__UNIX__)
+#define __WINDOWS__
+#endif
 
 
 //include files
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 #include "bitfile.h"
 
 //for stat in get_filesize and stat
@@ -82,8 +86,43 @@ struct ffblk {
 #ifdef __WINDOWS__
  #include <time.h>
  #include <windows.h>
- #include <dir.h>
  #include <io.h>
+ #include <conio.h>
+ #include <direct.h>
+ #include <sys/utime.h>
+
+
+//MSVC has no dir.h and no struct ffblk, so here is a
+//Borland compatible one (implemented in util.c)
+struct ffblk {
+  long handle;             //search handle (MSVC internal)
+  unsigned char ff_attrib;  //file attributes
+  unsigned short ff_ftime;  //dos packed time
+  unsigned short ff_fdate;  //dos packed date
+  unsigned long ff_fsize;   //file size
+  char ff_name[260];        //name of file as ASCIIZ string
+};
+
+
+//dos packed file time (the same layout as the borland one)
+struct ftime {
+  unsigned ft_tsec:5;	/* 0-29, double to get real seconds */
+  unsigned ft_min:6;	/* 0-59 */
+  unsigned ft_hour:5;	/* 0-23 */
+  unsigned ft_day:5;	/* 1-31 */
+  unsigned ft_month:4;	/* 1-12 */
+  unsigned ft_year:7;	/* since 1980 */
+};
+
+
+//dos file attributes (same values as the windows ones)
+#define FA_RDONLY 0x01
+#define FA_HIDDEN 0x02
+#define FA_SYSTEM 0x04
+#define FA_LABEL  0x08
+#define FA_DIREC  0x10
+#define FA_ARCH   0x20
+
 #endif
 
 #ifdef __DOS__
@@ -108,6 +147,16 @@ int _gotoxy(int x, int y);
 int _wherey(void);
 int _wherex(void);
 int tc(int _attr);
+
+//util.c (msvc compatibility layer)
+//the crt filelength() only works on files opened for writing,
+//so use our own one (util.c) instead
+int asd_filelength(int fd);
+#define filelength(fd) asd_filelength(fd)
+int findfirst(const char *path, struct ffblk *ffblk, int attrib);
+int findnext(struct ffblk *ffblk);
+void findclose(struct ffblk *ffblk);
+int setftime(int fd, struct ftime *ft);
 #endif
 
 

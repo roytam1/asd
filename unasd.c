@@ -135,7 +135,7 @@ int read_f_archive(void)
 
       for (j=0; j<c; j++)
 	{
-	  f_archive[i].filename[j] = InputBits(bit_infile,8);
+	  f_archive[i].filename[j] = (char) InputBits(bit_infile,8);
 #ifdef __UNIX__
 	  if (f_archive[i].filename[j]=='\\')
 	    {
@@ -185,37 +185,54 @@ int check_file(char *filename)
 {
   int result;
   char *temp_filename;
+  char *asd_filename;
+  int c1,c2,c3;
+
   result=0;
   temp_filename = (char*) malloc ((sizeof(char)*(strlen(filename)+10)) );
   temp_filename[0]='\0';
   strcpy(temp_filename,filename);
-  
+
+  /* room for the name + ".asd" + null (the name of the caller must not be changed) */
+  asd_filename = (char*) malloc ((sizeof(char)*(strlen(filename)+6)) );
+  strcpy(asd_filename,filename);
+
   if ((infile = fopen(filename,"rb"))==NULL) 
     {
       result=1;
-      filename = (char*) realloc(filename,(strlen(filename)+6) * sizeof(char));
-      strcat(filename,".asd");
-      if ((infile = fopen(filename,"rb"))==NULL) 
+      strcat(asd_filename,".asd");
+      if ((infile = fopen(asd_filename,"rb"))==NULL) 
 	{
-	  tc(RED);printf("File [%s] or [%s.asd] does not exist !\n",temp_filename,temp_filename);tc(NORMAL);
-	  fclose(infile);
-	  free_mem(temp_filename);
-	  exit(EXIT_FAILURE);
+ 	  tc(RED);printf("File [%s] or [%s.asd] does not exist !\n",temp_filename,temp_filename);tc(NORMAL);
+ 	  free_mem(asd_filename);
+ 	  free_mem(temp_filename);
+ 	  exit(EXIT_FAILURE);
 	}
       file_need_asd_ext=1;
     }
+  free_mem(asd_filename);
 
-  if ( (_getc(infile)!='A') | (_getc(infile)!='S') | (_getc(infile)!='D')  )
+  /* note: the chars must be read one by one, the order of the
+   * evaluation of the operands is not the same in every compiler */
+  c1=_getc(infile);
+  c2=_getc(infile);
+  c3=_getc(infile);
+
+  if ( (c1!='A') | (c2!='S') | (c3!='D')  )
     {
       /* if file is exe file */
       if  (filelength(fileno(infile)) > sfx_data_size)
 	{
 	  fseek(infile,sfx_data_size,SEEK_SET);
-	  if ( (_getc(infile)=='A') && (_getc(infile)=='S') && (_getc(infile)=='D')  )
+	  c1=_getc(infile);
+	  c2=_getc(infile);
+	  c3=_getc(infile);
+	  if ( (c1=='A') && (c2=='S') && (c3=='D')  )
 	    {
 	      asd_version[0] = _getc(infile);
 	      asd_version[2] = _getc(infile);
-	      if ( (asd_version[0] != '0') | ((asd_version[2] != '1') & (asd_version[2] != '2')) | (_getc(infile)!=26)  )
+	      c1=_getc(infile);
+	      if ( (asd_version[0] != '0') | ((asd_version[2] != '1') & (asd_version[2] != '2')) | (c1!=26)  )
 		{
 		  tc(RED);printf("[%s] is NOT an ASD 0.1.x archive, please download latest ASD archiver and try again !\n",filename);tc(NORMAL);
 		  fclose(infile);
@@ -223,6 +240,7 @@ int check_file(char *filename)
 		  exit(EXIT_FAILURE);
 		}
 	      is_exe_file=1;
+	      free_mem(temp_filename);
 	      return(result);
 	    }
 	}
@@ -234,7 +252,8 @@ int check_file(char *filename)
 
   asd_version[0] = _getc(infile);
   asd_version[2] = _getc(infile);
-  if ( (asd_version[0] != '0') | ((asd_version[2] != '1') & (asd_version[2] != '2') ) | (_getc(infile)!=26)  )
+  c1=_getc(infile);
+  if ( (asd_version[0] != '0') | ((asd_version[2] != '1') & (asd_version[2] != '2') ) | (c1!=26)  )
     {
       tc(RED);printf("[%s] is NOT an ASD 0.1.x or 0.2.x archive, please download latest ASD archiver and try again !\n ",filename);tc(NORMAL);
       fclose(infile);
@@ -244,6 +263,7 @@ int check_file(char *filename)
   free_mem(temp_filename);
   return(result);
 }
+
 
 
 
@@ -372,6 +392,7 @@ int extract(char *filename)
   unsigned long mb_val;
   long f_num=-1; /* first -1 to be 0 at first file */
   unsigned long l1;
+  char *arcname;
 
   filesize_count=0;
   bpos=0;
@@ -379,20 +400,20 @@ int extract(char *filename)
   check_file(filename); 
   fclose(infile);
 
+  /* the name of the archive to read (the name of the caller must not be changed) */
+  arcname = (char*) malloc ((sizeof(char)*(strlen(filename)+6)) );
+  strcpy(arcname,filename);
   if (file_need_asd_ext==1)
     {
-      filename = (char*) realloc(filename,(strlen(filename)+6) * sizeof(char));
-      strcat(filename,".asd\0");
+      strcat(arcname,".asd\0");
     }
 
-
-
-
-  if ((bit_infile = OpenInputBitFile(filename)) == NULL)
+  if ((bit_infile = OpenInputBitFile(arcname)) == NULL)
     {
       tc(RED);
       printf("\nError: could not open file to extract\n");
       tc(NORMAL);
+      free_mem(arcname);
       exit(-1);
     }
 
@@ -409,12 +430,13 @@ int extract(char *filename)
   InputBits(bit_infile,8);
   InputBits(bit_infile,8);
 
-  tc(YELLOW);printf("þ ");tc(NORMAL);
+  tc(YELLOW);printf("- ");tc(NORMAL);
   if (testa==1)
     printf("\rTesting archive: ");
   else
     printf("Extracting archive: ");
-  tc(GREEN);printf("[");tc(NORMAL);printf("%s",filename);tc(GREEN);printf("]\r\n");tc(NORMAL);     
+  tc(GREEN);printf("[");tc(NORMAL);printf("%s",arcname);tc(GREEN);printf("]\r\n");tc(NORMAL);     
+
 
   read_f_archive();
 
@@ -439,6 +461,8 @@ int extract(char *filename)
   
       while (1)
 	{
+	  /* no more files in the archive */
+	  if (f_num==-1) break;
 	  if ((d = InputBits(bit_infile,8)) == B_EOF) break;
 	  for (k=128; k>=1; k-=(k/2))
 	    {
@@ -458,6 +482,9 @@ int extract(char *filename)
 			if ((f_num=next_file(f_num))==-1)
 			  break;
 		      
+		      /* no more files in the archive */
+		      if (f_num==-1) break;
+
 		      c=buffer[(bpos+buffer_size-pos-1) % buffer_size];
 		      if (testa!=1) putc(c,outfile);
 		      crc32_val=crc32(c,crc32_val);
@@ -475,6 +502,9 @@ int extract(char *filename)
 		    if ((f_num=next_file(f_num))==-1)
 		      break;
 		  
+		  /* no more files in the archive */
+		  if (f_num==-1) break;
+
 		  if (testa!=1) putc(c,outfile);
 		  crc32_val=crc32(c,crc32_val);
 		  buffer[bpos++]=c;bpos = bpos % buffer_size;
@@ -538,27 +568,27 @@ int extract(char *filename)
    /* set data so no errors will appear in the future.. */
       for (l1=0; l1<(unsigned)(LITERAL_NUM_CODES); l1++)
 	{
-	  literal_high_tree[l1]=NULL;
-	  literal_low_tree[l1]=NULL;
+	  literal_high_tree[l1]=0;
+	  literal_low_tree[l1]=0;
 	  /* x2 */
-	  literal_count[l1]=NULL;
-	  literal_from_tree[l1]=NULL;
-	  literal_counted_tree[l1]=NULL;
-	  literal_count[l1*2]=NULL;
-	  literal_from_tree[l1*2]=NULL;
-	  literal_counted_tree[l1*2]=NULL;
+	  literal_count[l1]=0;
+	  literal_from_tree[l1]=0;
+	  literal_counted_tree[l1]=0;
+	  literal_count[l1*2]=0;
+	  literal_from_tree[l1*2]=0;
+	  literal_counted_tree[l1*2]=0;
 	}
       for (l1=0; l1<((unsigned)OFFSET_NUM_CODES); l1++)
 	{
-	  offset_high_tree[l1]=NULL;
-	  offset_low_tree[l1]=NULL;
+	  offset_high_tree[l1]=0;
+	  offset_low_tree[l1]=0;
 	  /* x2 */
-	  offset_count[l1]=NULL;
-	  offset_from_tree[l1]=NULL;
-	  offset_counted_tree[l1]=NULL;
-	  offset_count[l1*2]=NULL;
-	  offset_from_tree[l1*2]=NULL;
-	  offset_counted_tree[l1*2]=NULL;
+	  offset_count[l1]=0;
+	  offset_from_tree[l1]=0;
+	  offset_counted_tree[l1]=0;
+	  offset_count[l1*2]=0;
+	  offset_from_tree[l1*2]=0;
+	  offset_counted_tree[l1*2]=0;
 	}
 
       /* init huffman */
@@ -583,6 +613,8 @@ int extract(char *filename)
 
       while (1)
 	{
+	  /* no more files in the archive */
+	  if (f_num==-1) break;
 	  if ( (d = literal_get_literal(bit_infile)) == B_EOF) break;
 	  if (d>255)
 	    {	
@@ -616,6 +648,9 @@ int extract(char *filename)
 		    if ((f_num=next_file(f_num))==-1)
 		      break;
 
+		  /* no more files in the archive */
+		  if (f_num==-1) break;
+
 		  c=buffer[(bpos+buffer_size-pos-3) % buffer_size];
 		  if (testa!=1) putc(c,outfile);
 		  crc32_val=crc32(c,crc32_val);
@@ -629,6 +664,9 @@ int extract(char *filename)
 	      while (f_archive[f_num].filesize==filesize_count)
 		if ((f_num=next_file(f_num))==-1)
 		  break;
+
+	      /* no more files in the archive */
+	      if (f_num==-1) break;
 
 	      if (testa!=1) putc(d,outfile);
 	      crc32_val=crc32(d,crc32_val);
@@ -668,7 +706,7 @@ int extract(char *filename)
 
   if (errors==0)
     {
-      tc(YELLOW);printf("þ ");tc(NORMAL);printf("All files OK !\n");tc(NORMAL);
+      tc(YELLOW);printf("- ");tc(NORMAL);printf("All files OK !\n");tc(NORMAL);
     }
   else
     {
@@ -676,6 +714,7 @@ int extract(char *filename)
     }
 
   CloseInputBitFile(bit_infile);
+  free_mem(arcname);
   return(0);
 }
 
@@ -701,6 +740,7 @@ int list(char *filename)
   unsigned int i,j,k,x,y,num_files;
   unsigned long size,total_size,ttime,ddate;
   unsigned long crc;
+  int c1,c2;
 #ifdef __UNIX__
   int slashfix;
 #endif
@@ -712,7 +752,7 @@ int list(char *filename)
   check_file(filename);
 
   tc(YELLOW);
-  printf("þ ");tc(NORMAL);printf("Listing archive: ");tc(GREEN);printf("[");tc(NORMAL);
+  printf("- ");tc(NORMAL);printf("Listing archive: ");tc(GREEN);printf("[");tc(NORMAL);
   printf("%s",filename);
   tc(GREEN);printf("]\r\n\r\n");tc(NORMAL);
   
@@ -763,7 +803,11 @@ int list(char *filename)
       printf("  %ld-%02d-%02d %02d:%02d:%02d",((ddate & 0xfe00) >>9)+1980,
 	     (ddate & 0x1e0) >>5,(ddate & 0x1f),(ttime & 0xf800) >>11,
 	     (ttime & 0x7e0) >>5,(ttime & 0x1f) << 1);
-      y=_getc(infile)+_getc(infile)*256;
+      /* note: the chars must be read one by one, the order of the
+       * evaluation of the operands is not the same in every compiler */
+      c1=_getc(infile);
+      c2=_getc(infile);
+      y=c1+c2*256;
 
 #ifndef __UNIX__
       if (y & FA_ARCH)   att[0]='N'; else att[0]='-';  
@@ -796,7 +840,12 @@ int list(char *filename)
   tc(GREEN);
   printf("---------------------------------------------------------------------------\r\n");
   tc(YELLOW);
-  printf("þ ");tc(NORMAL);printf("Total file(s) in archive:%ld, Space saved %ld%\n",num_files,100-((filelength(fileno(infile))*100)/total_size) );tc(NORMAL);
+  printf("- ");tc(NORMAL);
+  if (total_size>0)
+    printf("Total file(s) in archive:%ld, Space saved %ld%%\n",num_files,100-((filelength(fileno(infile))*100)/total_size) );
+  else
+    printf("Total file(s) in archive:%ld\n",num_files);
+  tc(NORMAL);
   fclose(infile);
   return(0);
 }
@@ -870,7 +919,7 @@ int main(int argc, char *argv[])
   //count switches
   for (m=1; m<argc; m++)
     {
-      if (toupper(argv[m][0]=='-'))
+      if ((argv[m][0]=='-') && (argv[m][1]!='\0'))
 	{
 	  switches++;
 	  if (toupper(argv[m][1])=='Y') always=1;
