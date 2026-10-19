@@ -11,7 +11,6 @@ int main()
   long f_size;
   int c,linebreak;
   char s[34];
-  
   linebreak=0;
 
   infile=fopen("sfx.dat","rb");

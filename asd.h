@@ -1,6 +1,6 @@
 #define __COLOR__
 
-#define __WINDOWS__      
+//#define __WINDOWS__      
 //or
 //#define __DOS__
 //or
@@ -10,10 +10,15 @@
 //include files
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "bitfile.h"
 
 //for stat in get_filesize and stat
 #include <sys/stat.h>
+
+
+
+#define free_mem(a) { if (a) free(a); }
+
 
 
 #ifdef __UNIX__
@@ -24,7 +29,6 @@
 //#include <sys/stat.h>
 #include <unistd.h>
 #include <termios.h>
-
 
 
 
@@ -61,24 +65,40 @@ struct ffblk {
 #define FA_DIREC  16
 #define FA_ARCH   32
 
-
-
 #endif
 
 
+#define CMP_ZERO      0
+#define CMP_FASTEST   1
+#define CMP_FAST      8
+#define CMP_NORMAL    48
+#define CMP_GOOD      512
+#define CMP_MAX       4095
+#define CMP_ULTRA     65535
+
+
+
+
 #ifdef __WINDOWS__
+ #include <time.h>
  #include <windows.h>
  #include <dir.h>
  #include <io.h>
 #endif
 
 #ifdef __DOS__
+ #include <time.h>
  #include <dos.h>
  #include <dir.h>
  #include <io.h>
- #define EXIT_SUCCESS 0
- #define EXIT_FAILURE -1
+ #include <conio.h>
+
+// #define EXIT_SUCCESS 0
+// #define EXIT_FAILURE -1
  #define _dos_setfileattr(a,b) _chmod(a,1,b)
+#define _gotoxy(a,b) gotoxy(a,b)
+#define _tc(a) textcolor(a)
+#define _getch() getch()
 #endif
 
 
@@ -95,12 +115,15 @@ int tc(int _attr);
 
 //util.c
 int file_exist(char*);
+#ifndef __DOS__
+int _getch(void);
+#endif
 
 
 //asd.c
 int read_f_archive(void);
 int check_file(char *filename);
-int next_file(long n_file);
+long next_file(long n_file);
 int extract(char *filename);
 int file_exist(char *file);
 int list(char *filename);
@@ -109,16 +132,42 @@ int add(char *filename, int argc, char *argv[]);
 int sfx(char *filename);
 void help();
 
+//decode.c
+
+int literal_get_lowerst(void);
+void literal_build_tree(void);
+void literal_rescale_counts(void);
+int literal_get_literal(BITFILE *);
+int offset_get_lowerst(void);
+void offset_build_tree(void);
+void offset_rescale_counts(void);
+int offset_get_offset(BITFILE*);
+
 
 //crc.c
 unsigned long crc32(unsigned int ch, unsigned long crc32val);
 unsigned long crc32_c(const unsigned char *s, unsigned int len);
 
 //encode.c
-int b_len(int i, int j);
-void InsertNode(int r);
-void DeleteNode(int p);
-int Encode(char *in_file, char *out_file, int asd_val);
+//int b_len(int i, int j);
+//void InsertNode(int r);
+//void DeleteNode(int p);
+//void encode(unsigned int,unsigned char, FILE*,BITFILE*);
+void encode(unsigned long, unsigned int, unsigned int, unsigned int,unsigned int, unsigned int, unsigned int, FILE*, BITFILE*);
+
+//util.c
+#ifndef __DOS__
+int _gotoxy(int, int);
+int _wherey(void);
+#endif
+int tc(int);
+int file_exist(char*);
+long get_filesize(char*);
+int _getc(FILE*);
+#ifndef __DOS__
+int _dos_setfileattr(char *, int);
+#endif
+int create_dir(char*);
 
 
 
@@ -137,6 +186,7 @@ int Encode(char *in_file, char *out_file, int asd_val);
 //variables to be used in more than one places..
 
 extern FILE *infile, *outfile;
+extern BITFILE *bit_infile, *bit_outfile;
 
 //for crc32_value
 extern unsigned long crc32_val;
@@ -159,6 +209,41 @@ extern char subdir;
 
 extern int error;
 
+extern unsigned int buffer_bits,window_bits;
+extern unsigned long buffer_size;
+extern int offset_huff_rescale_factor;
+extern int offset_huff_rehuff_factor;
+extern int literal_huff_rescale_factor;
+extern int literal_huff_rehuff_factor;
+
+//for code table
+extern unsigned long ct_bits;
+extern unsigned long ct_value;
+extern unsigned long ct_code;
+
+extern char *buffer;
+extern unsigned int bpos;
+
+/* huffman coding part */
+extern int LITERAL_NUM_CODES;
+extern unsigned long *literal_count;
+extern int *literal_high_tree,*literal_low_tree;
+extern int *literal_from_tree;
+extern short *literal_counted_tree;
+extern unsigned int literal_scale_counter;
+extern unsigned int literal_huff_counter;
+extern unsigned int literal_rehuff;
+extern unsigned int literal_rescale;
+
+extern int OFFSET_NUM_CODES;
+extern unsigned long *offset_count;
+extern int *offset_high_tree,*offset_low_tree;
+extern int *offset_from_tree;
+extern short *offset_counted_tree;
+extern unsigned int offset_scale_counter;
+extern unsigned int offset_huff_counter;
+extern unsigned int offset_rehuff;
+extern unsigned int offset_rescale;
 
 
 

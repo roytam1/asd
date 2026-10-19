@@ -16,8 +16,9 @@ int tc(int);
 int file_exist(char*);
 long get_filesize(char*);
 int _getc(FILE*);
-
-
+int _getch(void);
+int getch(void);
+int create_dir(char*);
 
 //might be good to add better errormessage here..
 int _getc(FILE *stream)
@@ -52,7 +53,7 @@ int file_exist(char *file)
 #ifndef __UNIX__
   FILE *f;
   
-  if (f=fopen(file,"r")) 
+  if ((f=fopen(file,"r"))!=0) 
     {
       fclose(f);return(1);
     }
@@ -188,7 +189,7 @@ int findfirst()
 
 #ifdef __WINDOWS__
 
-int _getch()
+int _getch(void)
 {
   return(getch());
 }
@@ -231,3 +232,78 @@ int tc(int _attr) {
  #define _wherey() wherey()
  #define _gotoxy(a,b) gotoxy(a,b)
 #endif
+
+
+int create_dir(char *mdir)
+{
+  int i,j;
+  int subs=0;
+  char t_dir[300];
+
+  t_dir[0]='\0';
+  
+  
+  for (i=0; (unsigned)i<strlen(mdir); i++)
+    {
+#ifdef __UNIX__
+      if (mdir[i]=='/')
+#endif
+#ifndef __UNIX__
+      if (mdir[i]=='\\')
+#endif
+	{
+	  subs++;
+	}
+
+    }
+  
+  //normal file
+  if (subs==0) 
+    {
+      return 0;
+    }
+  
+  
+  i=0;
+  j=0;
+  while (1)
+    {
+#ifdef __UNIX__
+      if (mdir[i]=='/')
+#endif
+#ifndef __UNIX__
+      if (mdir[i]=='\\')
+#endif
+	{
+	  j++;
+	  t_dir[i]='\0';
+
+#ifdef __UNIX__
+	  mkdir(t_dir,0xFFFF);
+#endif
+#ifndef __UNIX__
+	  mkdir(t_dir);
+#endif
+	  if (j==subs) 
+	    {
+	      break;
+	    }
+
+#ifdef __UNIX__
+	  t_dir[i]='/';
+#endif
+#ifndef __UNIX__
+	  t_dir[i]='\\';
+#endif
+	}
+      else
+	{
+	  t_dir[i]=mdir[i];
+	}
+      i++;
+    }
+  return 1;
+}
+
+
+
