@@ -188,9 +188,142 @@ int findfirst()
 
 #ifdef __WINDOWS__
 
-int _getch()
+//not defined in all win32 header versions
+#ifndef INVALID_FILE_ATTRIBUTES
+#define INVALID_FILE_ATTRIBUTES ((DWORD)-1)
+#endif
+
+//_getch() is provided by the msvc crt (conio.h) so dont redefine it here
+
+
+//length of the file behind a file descriptor
+int asd_filelength(int fd)
 {
-  return(getch());
+  struct _stat st;
+
+  if (_fstat(fd,&st)!=0) return(0);
+  return((int)st.st_size);
+}
+
+
+//set the dos file attributes of a file
+//(the dos attribute bits are the same as the windows ones)
+int _dos_setfileattr(const char *filename,int attr)
+{
+  DWORD cur,newattr;
+
+  cur=GetFileAttributes(filename);
+  if (cur==INVALID_FILE_ATTRIBUTES) return(0);
+
+  newattr=cur & FILE_ATTRIBUTE_DIRECTORY;
+
+  if (attr & FA_RDONLY) newattr|=FILE_ATTRIBUTE_READONLY;
+  if (attr & FA_HIDDEN) newattr|=FILE_ATTRIBUTE_HIDDEN;
+  if (attr & FA_SYSTEM) newattr|=FILE_ATTRIBUTE_SYSTEM;
+  if (attr & FA_ARCH)   newattr|=FILE_ATTRIBUTE_ARCHIVE;
+
+  if (SetFileAttributes(filename,newattr)) return(0);
+  return(-1);
+}
+
+
+//set the time of an open file (borland setftime())
+int setftime(int fd,struct ftime *ft)
+{
+  struct tm t;
+  struct _utimbuf ut;
+  time_t tt;
+
+  memset(&t,0,sizeof(t));
+  t.tm_sec   = ft->ft_tsec*2;
+  t.tm_min   = ft->ft_min;
+  t.tm_hour  = ft->ft_hour;
+  t.tm_mday  = ft->ft_day;
+  t.tm_mon   = ft->ft_month-1;
+  t.tm_year  = ft->ft_year+80;   //years since 1900
+  t.tm_isdst = -1;
+
+  tt=mktime(&t);
+  if (tt==(time_t)-1) return(-1);
+
+  ut.actime=tt;
+  ut.modtime=tt;
+  return(_futime(fd,&ut));
+}
+
+
+//fill in a borland style ffblk from a msvc _finddata_t
+static void ffblk_from_finddata(struct ffblk *ffblk,struct _finddata_t *fd)
+{
+  time_t t;
+  struct tm *lt;
+
+  ffblk->ff_attrib=(unsigned char)(fd->attrib & 0xff);
+  ffblk->ff_fsize=(unsigned long)fd->size;
+  strncpy(ffblk->ff_name,fd->name,sizeof(ffblk->ff_name)-1);
+  ffblk->ff_name[sizeof(ffblk->ff_name)-1]='\0';
+
+  //convert to the dos packed time/date used by the archive format
+  t=fd->time_write;
+  lt=localtime(&t);
+  if (lt==NULL) return;
+
+  ffblk->ff_ftime=(unsigned short)((lt->tm_sec/2) | (lt->tm_min<<5) | (lt->tm_hour<<11));
+  ffblk->ff_fdate=(unsigned short)(lt->tm_mday | ((lt->tm_mon+1)<<5) | ((lt->tm_year+1900-1980)<<9));
+}
+
+
+//find the first file matching the pattern (borland compatible)
+int findfirst(const char *path,struct ffblk *ffblk,int attrib)
+{
+  struct _finddata_t fd;
+  long handle;
+
+  //the attribute mask is not used, all normal files are returned
+
+  handle=_findfirst(path,&fd);
+  if (handle==-1) return(-1);
+
+  //skip directories (the dos version did that with the attribute mask)
+  while (fd.attrib & _A_SUBDIR)
+    {
+      if (_findnext(handle,&fd)==-1)
+        {
+          _findclose(handle);
+          return(-1);
+        }
+    }
+
+  ffblk->handle=handle;
+  ffblk_from_finddata(ffblk,&fd);
+  return(0);
+}
+
+
+//find the next file matching the pattern (borland compatible)
+int findnext(struct ffblk *ffblk)
+{
+  struct _finddata_t fd;
+
+  if (_findnext(ffblk->handle,&fd)==-1)
+    {
+      _findclose(ffblk->handle);
+      ffblk->handle=-1;
+      return(-1);
+    }
+
+  while (fd.attrib & _A_SUBDIR)
+    {
+      if (_findnext(ffblk->handle,&fd)==-1)
+        {
+          _findclose(ffblk->handle);
+          ffblk->handle=-1;
+          return(-1);
+        }
+    }
+
+  ffblk_from_finddata(ffblk,&fd);
+  return(0);
 }
 
 

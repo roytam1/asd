@@ -1,8 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 FILE *infile,*outfile;
+
+
+//the crt filelength() only works on files opened for writing,
+//so get the size with _fstat instead
+long get_filesize(FILE *f)
+{
+  struct _stat st;
+
+  if (_fstat(fileno(f),&st)!=0) return(0);
+  return((long)st.st_size);
+}
 
 
 
@@ -17,7 +29,7 @@ int main()
   infile=fopen("sfx.dat","rb");
   outfile=fopen("sfx.h","wb");
   
-  f_size=filelength(fileno(infile));
+  f_size=get_filesize(infile);
   itoa(f_size,s,10);
   
   fputs("#define sfx_data_size ",outfile);

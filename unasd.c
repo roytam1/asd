@@ -108,7 +108,7 @@ int list(char*);
 
 
 
-//don´t forget to free mem too later..
+//don't forget to free mem too later..
 int read_f_archive(void)
 {
   int i,j,c,d;
@@ -117,6 +117,13 @@ int read_f_archive(void)
   if ((num_files=_getc(infile))==EOF) exit(-1);
 
   num_files+=_getc(infile)*0x100;
+  
+  //no files in the archive ?
+  if (num_files<1)
+    {
+      tc(RED);printf("Empty or corrupt archive !\n");tc(NORMAL);
+      exit(EXIT_FAILURE);
+    }
   
   //allocating memmory
   f_archive = (file_struct*) malloc ((sizeof(file_struct))* (num_files));
@@ -168,62 +175,85 @@ int check_file(char *filename)
 {
   int result;
   char *temp_filename;
+  char *asd_filename;
+  int c1,c2,c3;
+
   result=0;
-  temp_filename = (char*) malloc ((sizeof(char)*strlen(filename)) );
+
+  //room for the name + ".asd" + null
+  asd_filename=(char*) malloc (sizeof(char)*(strlen(filename)+6));
+  strcpy(asd_filename,filename);
+
+  //room for the name + null
+  temp_filename = (char*) malloc ((sizeof(char)*(strlen(filename)+1)) );
   strcpy(temp_filename,filename);
 
   if ((infile = fopen(filename,"rb"))==NULL) 
     {
       result=1;
-      strcat(filename,".asd");
-      if ((infile = fopen(filename,"rb"))==NULL) 
+      strcat(asd_filename,".asd");
+      if ((infile = fopen(asd_filename,"rb"))==NULL) 
 	{
-	  tc(RED);printf("File [%s] or [%s.asd] does not exist !\n",temp_filename,temp_filename);tc(NORMAL);
-	  fclose(infile);
-	  //free(filename);
-	  free(temp_filename);
-	  exit(EXIT_FAILURE);
+ 	  tc(RED);printf("File [%s] or [%s.asd] does not exist !\n",temp_filename,temp_filename);tc(NORMAL);
+ 	  free(asd_filename);
+ 	  free(temp_filename);
+ 	  exit(EXIT_FAILURE);
 	}
     }
+  free(asd_filename);
 
-  if ( (_getc(infile)!='A') | (_getc(infile)!='S') | (_getc(infile)!='D')  )
+  //note: the chars must be read one by one, the order of the
+  //evaluation of the operands is not the same in every compiler
+  c1=_getc(infile);
+  c2=_getc(infile);
+  c3=_getc(infile);
+
+  if ( (c1!='A') | (c2!='S') | (c3!='D')  )
     {
       //if file is exe file
       if  (filelength(fileno(infile)) > sfx_data_size)
 	{
 	  fseek(infile,sfx_data_size,SEEK_SET);
-	  if ( (_getc(infile)=='A') && (_getc(infile)=='S') && (_getc(infile)=='D')  )
+	  c1=_getc(infile);
+	  c2=_getc(infile);
+	  c3=_getc(infile);
+	  if ( (c1=='A') && (c2=='S') && (c3=='D')  )
 	    {
-	      if ( (_getc(infile)!='0') | (_getc(infile)!='1') | (_getc(infile)!=26)  )
+	      c1=_getc(infile);
+	      c2=_getc(infile);
+	      c3=_getc(infile);
+	      if ( (c1!='0') | (c2!='1') | (c3!=26)  )
 		{
 		  tc(RED);printf("NOT an ASD 0.1.x archive, please download latest ASD archiver and try again !\n");tc(NORMAL);
 		  fclose(infile);
-		  //free(filename);
 		  free(temp_filename);
 		  exit(EXIT_FAILURE);
 		}
+	      free(temp_filename);
 	      return(result);
 	    }
 	  
 	}
       tc(RED);printf("NOT an ASD archive file !\n");tc(NORMAL);
       fclose(infile);
-      //free(filename);
       free(temp_filename);
       exit(EXIT_FAILURE);
     }
   
-  if ( (_getc(infile)!='0') | (_getc(infile)!='1') | (_getc(infile)!=26)  )
+  c1=_getc(infile);
+  c2=_getc(infile);
+  c3=_getc(infile);
+  if ( (c1!='0') | (c2!='1') | (c3!=26)  )
     {
       tc(RED);printf("NOT an ASD 0.1.x archive, please download latest ASD archiver and try again !\n ");tc(NORMAL);
       fclose(infile);
-      //free(filename);
       free(temp_filename);
       exit(EXIT_FAILURE);
     }
   free(temp_filename);
   return(result);
 }
+
 
 
 
@@ -366,18 +396,13 @@ int extract(char *filename)
   filesize_count=0;
   bpos=0;
 
-  //open infile (add errorchecking here later..)
-  if ((infile=fopen(filename,"rb"))==NULL) 
-    {
-      tc(RED);
-      printf("ERROR: could not open infile (permission denied) \n");
-      tc(NORMAL);
-    }
+  //open infile (check_file() opens the file and also tries name.asd
+  //if the file itself does not exist, it exits if that fails too)
   
   //check files...  
   check_file(filename); 
   
-  tc(YELLOW);printf("þ ");tc(NORMAL);
+  tc(YELLOW);printf("- ");tc(NORMAL);
   if (testa==1)
     printf("\rTesting archive: ");
   else
@@ -399,6 +424,8 @@ int extract(char *filename)
   
   while (1)
     {
+      //no more files in the archive
+      if (f_num==-1) break;
       if ((d=_getc(infile)) == EOF) break;
       for (k=128; k>=1; k-=(k/2))
 	{
@@ -418,6 +445,9 @@ int extract(char *filename)
 		    if ((f_num=next_file(f_num))==-1)
 		      break;
 
+		  //no more files in the archive
+		  if (f_num==-1) break;
+
 		  c=buffer[(bpos+buffer_size-pos-1) % buffer_size];
 		  if (testa!=1) putc(c,outfile);
 		  crc32_val=crc32(c,crc32_val);
@@ -435,11 +465,16 @@ int extract(char *filename)
 		if ((f_num=next_file(f_num))==-1)
 		  break;
 
+	      //no more files in the archive
+	      if (f_num==-1) break;
+
 	      if (testa!=1) putc(c,outfile);
 	      crc32_val=crc32(c,crc32_val);
 	      buffer[bpos++]=c;bpos = bpos % buffer_size;
 	      filesize_count++;
 	    }
+	  //no more files in the archive
+	  if (f_num==-1) break;
 	  //break when 1
 	  if (k==1) break;
 	}
@@ -454,7 +489,7 @@ int extract(char *filename)
 
   if (errors==0)
     {
-      tc(YELLOW);printf("þ ");tc(NORMAL);printf("All files OK !\n");tc(NORMAL);
+      tc(YELLOW);printf("- ");tc(NORMAL);printf("All files OK !\n");tc(NORMAL);
     }
   else
     {
@@ -488,6 +523,7 @@ int list(char *filename)
   unsigned int i,j,k,x,y,num_files;
   unsigned long size,total_size,ttime,ddate;
   unsigned long crc;
+  int c1,c2;
 
   char att[10]="- - - -  \0";
   total_size=0;
@@ -496,7 +532,7 @@ int list(char *filename)
   check_file(filename);
 
   tc(YELLOW);
-  printf("þ ");tc(NORMAL);printf("Listing archive: ");tc(GREEN);printf("[");tc(NORMAL);
+  printf("- ");tc(NORMAL);printf("Listing archive: ");tc(GREEN);printf("[");tc(NORMAL);
   printf("%s",filename);
   tc(GREEN);printf("]\r\n\r\n");tc(NORMAL);
   
@@ -526,7 +562,11 @@ int list(char *filename)
       printf("  %ld-%02d-%02d %02d:%02d:%02d",((ddate & 0xfe00) >>9)+1980,
 	     (ddate & 0x1e0) >>5,(ddate & 0x1f),(ttime & 0xf800) >>11,
 	     (ttime & 0x7e0) >>5,(ttime & 0x1f) << 1);
-      y=_getc(infile)+_getc(infile)*256;
+      //note: the chars must be read one by one, the order of the
+      //evaluation of the operands is not the same in every compiler
+      c1=_getc(infile);
+      c2=_getc(infile);
+      y=c1+c2*256;
 
 #ifndef __UNIX__
       if (y & FA_ARCH)   att[0]='N'; else att[0]='-';  
@@ -557,7 +597,12 @@ int list(char *filename)
   tc(GREEN);
   printf("---------------------------------------------------------------------------\r\n");
   tc(YELLOW);
-  printf("þ ");tc(NORMAL);printf("Total file(s) in archive:%ld, Space saved %ld%\n",num_files,100-((filelength(fileno(infile))*100)/total_size) );tc(NORMAL);
+  printf("- ");tc(NORMAL);
+  if (total_size>0)
+    printf("Total file(s) in archive:%ld, Space saved %ld%\n",num_files,100-((filelength(fileno(infile))*100)/total_size) );
+  else
+    printf("Total file(s) in archive:%ld\n",num_files);
+  tc(NORMAL);
   fclose(infile);
   return(0);
 }
@@ -628,7 +673,7 @@ int main(int argc, char *argv[])
   //count switches
   for (m=1; m<argc; m++)
     {
-      if (toupper(argv[m][0]=='-'))
+      if ((argv[m][0]=='-') && (argv[m][1]!='\0'))
 	{
 	  switches++;
 	  if (toupper(argv[m][1])=='Y') always=1;

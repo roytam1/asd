@@ -107,7 +107,7 @@ int add(char*,int,char *[]);
 int sfx(char*);
 
 
-//don´t forget to free mem too later..
+//don't forget to free mem too later..
 int read_f_archive(void)
 {
   int i,j,c,d;
@@ -116,6 +116,13 @@ int read_f_archive(void)
   if ((num_files=_getc(infile))==EOF) exit(-1);
 
   num_files+=_getc(infile)*0x100;
+  
+  //no files in the archive ?
+  if (num_files<1)
+    {
+      tc(RED);printf("Empty or corrupt archive !\n");tc(NORMAL);
+      exit(EXIT_FAILURE);
+    }
   
   //allocating memmory
   f_archive = (file_struct*) malloc ((sizeof(file_struct))* (num_files));
@@ -172,38 +179,61 @@ int check_file(char *filename)
 {
   int result;
   char *temp_filename;
+  char *asd_filename;
+  int c1,c2,c3;
+
   result=0;
-  temp_filename = (char*) malloc ((sizeof(char)*strlen(filename)) );
+
+  //room for the name + ".asd" + null
+  asd_filename=(char*) malloc (sizeof(char)*(strlen(filename)+6));
+  strcpy(asd_filename,filename);
+
+  //room for the name + null
+  temp_filename = (char*) malloc ((sizeof(char)*(strlen(filename)+1)) );
   strcpy(temp_filename,filename);
 
   if ((infile = fopen(filename,"rb"))==NULL) 
     {
       result=1;
-      strcat(filename,".asd");
-      if ((infile = fopen(filename,"rb"))==NULL) 
+      strcat(asd_filename,".asd");
+      if ((infile = fopen(asd_filename,"rb"))==NULL) 
 	{
-	  tc(RED);printf("File [%s] or [%s.asd] does not exist !\n",temp_filename,temp_filename);tc(NORMAL);
-	  fclose(infile);
-	  free(temp_filename);
-	  exit(EXIT_FAILURE);
+ 	  tc(RED);printf("File [%s] or [%s.asd] does not exist !\n",temp_filename,temp_filename);tc(NORMAL);
+ 	  free(asd_filename);
+ 	  free(temp_filename);
+ 	  exit(EXIT_FAILURE);
 	}
     }
+  free(asd_filename);
 
-  if ( (_getc(infile)!='A') | (_getc(infile)!='S') | (_getc(infile)!='D')  )
+  //note: the chars must be read one by one, the order of the
+  //evaluation of the operands is not the same in every compiler
+  c1=_getc(infile);
+  c2=_getc(infile);
+  c3=_getc(infile);
+
+  if ( (c1!='A') | (c2!='S') | (c3!='D')  )
     {
       //if file is exe file
       if  (filelength(fileno(infile)) > sfx_data_size)
 	{
 	  fseek(infile,sfx_data_size,SEEK_SET);
-	  if ( (_getc(infile)=='A') && (_getc(infile)=='S') && (_getc(infile)=='D')  )
+	  c1=_getc(infile);
+	  c2=_getc(infile);
+	  c3=_getc(infile);
+	  if ( (c1=='A') && (c2=='S') && (c3=='D')  )
 	    {
-	      if ( (_getc(infile)!='0') | (_getc(infile)!='1') | (_getc(infile)!=26)  )
+	      c1=_getc(infile);
+	      c2=_getc(infile);
+	      c3=_getc(infile);
+	      if ( (c1!='0') | (c2!='1') | (c3!=26)  )
 		{
 		  tc(RED);printf("NOT an ASD 0.1.x archive, please download latest ASD archiver and try again !\n");tc(NORMAL);
 		  fclose(infile);
 		  free(temp_filename);
 		  exit(EXIT_FAILURE);
 		}
+	      free(temp_filename);
 	      return(result);
 	    }
 	  
@@ -214,7 +244,10 @@ int check_file(char *filename)
       exit(EXIT_FAILURE);
     }
   
-  if ( (_getc(infile)!='0') | (_getc(infile)!='1') | (_getc(infile)!=26)  )
+  c1=_getc(infile);
+  c2=_getc(infile);
+  c3=_getc(infile);
+  if ( (c1!='0') | (c2!='1') | (c3!=26)  )
     {
       tc(RED);printf("NOT an ASD 0.1.x archive, please download latest ASD archiver and try again !\n ");tc(NORMAL);
       fclose(infile);
@@ -224,6 +257,7 @@ int check_file(char *filename)
   free(temp_filename);
   return(result);
 }
+
 
 
 
@@ -359,19 +393,13 @@ int extract(char *filename)
   filesize_count=0;
   bpos=0;
 
-  //open infile (add errorchecking here later..)
-  if ((infile=fopen(filename,"rb"))==NULL)
-    {
-      tc(RED);
-      printf("\nError: could not open file to extract\n");
-      tc(NORMAL);
-      exit(-1);
-    }
-
+  //open infile (check_file() opens the file and also tries name.asd
+  //if the file itself does not exist, it exits if that fails too)
+  
   //check files...  
   check_file(filename); 
   
-  tc(YELLOW);printf("þ ");tc(NORMAL);
+  tc(YELLOW);printf("- ");tc(NORMAL);
   if (testa==1)
     printf("\rTesting archive: ");
   else
@@ -392,6 +420,8 @@ int extract(char *filename)
   
   while (1)
     {
+      //no more files in the archive
+      if (f_num==-1) break;
       if ((d=_getc(infile)) == EOF) break;
       for (k=128; k>=1; k-=(k/2))
 	{
@@ -411,6 +441,9 @@ int extract(char *filename)
 		    if ((f_num=next_file(f_num))==-1)
 		      break;
 
+		  //no more files in the archive
+		  if (f_num==-1) break;
+
 		  c=buffer[(bpos+buffer_size-pos-1) % buffer_size];
 		  if (testa!=1) putc(c,outfile);
 		  crc32_val=crc32(c,crc32_val);
@@ -428,11 +461,16 @@ int extract(char *filename)
 		if ((f_num=next_file(f_num))==-1)
 		  break;
 
+	      //no more files in the archive
+	      if (f_num==-1) break;
+
 	      if (testa!=1) putc(c,outfile);
 	      crc32_val=crc32(c,crc32_val);
 	      buffer[bpos++]=c;bpos = bpos % buffer_size;
 	      filesize_count++;
 	    }
+	  //no more files in the archive
+	  if (f_num==-1) break;
 	  //break when 1
 	  if (k==1) break;
 	}
@@ -447,7 +485,7 @@ int extract(char *filename)
 
   if (errors==0)
     {
-      tc(YELLOW);printf("þ ");tc(NORMAL);printf("All files OK !\n");tc(NORMAL);
+      tc(YELLOW);printf("- ");tc(NORMAL);printf("All files OK !\n");tc(NORMAL);
     }
   else
     {
@@ -476,6 +514,7 @@ int list(char *filename)
   unsigned int i,j,k,x,y,num_files;
   unsigned long size,total_size,ttime,ddate;
   unsigned long crc;
+  int c1,c2;
 
   char att[10]="- - - -  \0";
   total_size=0;
@@ -484,7 +523,7 @@ int list(char *filename)
   check_file(filename);
 
   tc(YELLOW);
-  printf("þ ");tc(NORMAL);printf("Listing archive: ");tc(GREEN);printf("[");tc(NORMAL);
+  printf("- ");tc(NORMAL);printf("Listing archive: ");tc(GREEN);printf("[");tc(NORMAL);
   printf("%s",filename);
   tc(GREEN);printf("]\r\n\r\n");tc(NORMAL);
   
@@ -514,7 +553,11 @@ int list(char *filename)
       printf("  %ld-%02d-%02d %02d:%02d:%02d",((ddate & 0xfe00) >>9)+1980,
 	     (ddate & 0x1e0) >>5,(ddate & 0x1f),(ttime & 0xf800) >>11,
 	     (ttime & 0x7e0) >>5,(ttime & 0x1f) << 1);
-      y=_getc(infile)+_getc(infile)*256;
+      //note: the chars must be read one by one, the order of the
+      //evaluation of the operands is not the same in every compiler
+      c1=_getc(infile);
+      c2=_getc(infile);
+      y=c1+c2*256;
 
 #ifndef __UNIX__
       if (y & FA_ARCH)   att[0]='N'; else att[0]='-';  
@@ -545,7 +588,12 @@ int list(char *filename)
   tc(GREEN);
   printf("---------------------------------------------------------------------------\r\n");
   tc(YELLOW);
-  printf("þ ");tc(NORMAL);printf("Total file(s) in archive:%ld, Space saved %ld%\n",num_files,100-((filelength(fileno(infile))*100)/total_size) );tc(NORMAL);
+  printf("- ");tc(NORMAL);
+  if (total_size>0)
+    printf("Total file(s) in archive:%ld, Space saved %ld%\n",num_files,100-((filelength(fileno(infile))*100)/total_size) );
+  else
+    printf("Total file(s) in archive:%ld\n",num_files);
+  tc(NORMAL);
   fclose(infile);
   return(0);
 }
@@ -618,16 +666,12 @@ int find(int num_args,char *args[])
 		//realloc
 		f_archive = (file_struct*) realloc (f_archive,sizeof(file_struct)*(num_files+1));
 		
-		f_archive[num_files].filename_length=(unsigned int) malloc (sizeof(unsigned int));
-		f_archive[num_files].filename_length=strlen(ffblk.ff_name);
+		f_archive[num_files].filename_length=(unsigned int) strlen(ffblk.ff_name);
 		f_archive[num_files].filename = (char*) malloc (sizeof(char)*(strlen(ffblk.ff_name)+1));//null too
 		strcpy(f_archive[num_files].filename,ffblk.ff_name);
-		f_archive[num_files].filesize= (long) malloc (sizeof(long));
 		f_archive[num_files].filesize=ffblk.ff_fsize;
 		//note you need to set CRC value during compress..
-		f_archive[num_files].filetime=(long) malloc (sizeof(long));
 		f_archive[num_files].filetime=ffblk.ff_ftime+ffblk.ff_fdate*65536;
-		f_archive[num_files].fileattribute=(int) malloc (sizeof(int));
 		f_archive[num_files].fileattribute=ffblk.ff_attrib;
 		if (n_attrib==1)
 		  f_archive[num_files].fileattribute=0;
@@ -757,26 +801,19 @@ int add(char *filenam, int argc, char *argv[])
   //this 3 lines and filenam in function is only for stupid gcc ;(
   //and free filename at the end here too..
   char* filename;
-  filename = (char*) malloc(strlen(filenam)*sizeof(char));
+  filename = (char*) malloc((strlen(filenam)+6)*sizeof(char));
   strcpy(filename,filenam);
 
 
   //first make sure that extension of the file is .asd
   i=(strlen(filename))-1;
 
-
-  if (i<4) {
-    filename = (char*) realloc(filename,(i+5) * sizeof(char));
-    strcat(filename,".asd");
-  }
-
-  i=strlen(filename)-1;
-  if ( !((filename[i-3]=='.') &&  (toupper(filename[i-2])=='A') &&  (toupper(filename[i-1])=='S') &&  (toupper(filename[i])=='D')))  {
-    filename=(char *) realloc(filename,(i+5)* sizeof(char));
-    strcat(filename,".asd");    
-  }
+  if ((i<4) || !((filename[i-3]=='.') &&  (toupper(filename[i-2])=='A') &&  (toupper(filename[i-1])=='S') &&  (toupper(filename[i])=='D')))
+    {
+      strcat(filename,".asd");
+    }
   
-  tc(YELLOW);printf("þ ");tc(NORMAL);printf("Creating archive ");
+  tc(YELLOW);printf("- ");tc(NORMAL);printf("Creating archive ");
   tc(GREEN);printf("[");tc(NORMAL);printf("%s",filename);tc(GREEN);
   printf("]\n");tc(NORMAL);
 
@@ -799,7 +836,7 @@ int add(char *filenam, int argc, char *argv[])
       _gotoxy(0,_wherey());printf("                                                                              ");_gotoxy(0,_wherey());
     }
  
-  tc(YELLOW);printf("þ ");tc(NORMAL);printf("Collecting files");tc(YELLOW);
+  tc(YELLOW);printf("- ");tc(NORMAL);printf("Collecting files");tc(YELLOW);
   printf("....\n");tc(NORMAL);
 
    if (argc==0)
@@ -856,7 +893,6 @@ int add(char *filenam, int argc, char *argv[])
 	  fputc(c,out_tempfile);  
 	  crc32_val=crc32(c,crc32_val);
 	}
-      f_archive[i].filecrc=(long) malloc (sizeof(long));
       f_archive[i].filecrc=crc32_val^0xffffffff;
        
       fclose(in_tempfile);
@@ -923,10 +959,10 @@ int add(char *filenam, int argc, char *argv[])
     free(f_archive[i].filename);
   free(f_archive);
 
-  tc(YELLOW);printf("þ ");tc(NORMAL);
+  tc(YELLOW);printf("- ");tc(NORMAL);
   printf("Total files to add: %ld\r\n",num_files);
 
-  tc(YELLOW);printf("þ ");tc(NORMAL);
+  tc(YELLOW);printf("- ");tc(NORMAL);
   if (c_hash_deep<400 && c_hash_deep>=100)
     printf("Encoding level: Normal");
   if (c_hash_deep>=400)
@@ -961,7 +997,7 @@ int sfx(char *fame)
   unsigned long s_size;
   char *fname;
 
-  fname = (char*) malloc(strlen(fame)*sizeof(char));
+  fname = (char*) malloc((strlen(fame)+6)*sizeof(char));
   strcpy(fname,fame);
 
 
@@ -1033,9 +1069,9 @@ int sfx(char *fame)
     }
   
 
-     tc(YELLOW);printf("þ ");tc(NORMAL);printf("Converting to SFX file....");
+     tc(YELLOW);printf("- ");tc(NORMAL);printf("Converting to SFX file....");
      tc(GREEN);printf("[");tc(NORMAL);
-     printf(fname);
+     printf("%s",fname);
      tc(GREEN);printf("]\r\n");tc(NORMAL);
   
      //copy sfx header..
@@ -1052,7 +1088,7 @@ int sfx(char *fame)
 #ifdef __UNIX__
      chmod(fname,777);
 #endif
-     tc(YELLOW);printf("þ ");tc(NORMAL);printf("Done !\r\n");tc(NORMAL);
+     tc(YELLOW);printf("- ");tc(NORMAL);printf("Done !\r\n");tc(NORMAL);
      free(fname);
      return(0);
 }
@@ -1138,11 +1174,11 @@ int main(int argc, char *argv[])
 	  printf("it did not do much to the compression ratio.\r\n");
 	  printf("\n");
 	  printf("New in 0.1.5\r\n");
-	  printf("þ Rewritten into C code.\r\n");
-	  printf("þ Uses Hash table to speed up compression. (about 20 times faster)\r\n");
-	  printf("þ Also fixed some bugs from 0.1.4\r\n");
-	  printf("þ And dome other things too, see ASD.DOC for more info.\r\n");
-	  printf("þ Released with full source codes.\r\n");
+	  printf("- Rewritten into C code.\r\n");
+	  printf("- Uses Hash table to speed up compression. (about 20 times faster)\r\n");
+	  printf("- Also fixed some bugs from 0.1.4\r\n");
+	  printf("- And dome other things too, see ASD.DOC for more info.\r\n");
+	  printf("- Released with full source codes.\r\n");
 	  printf("\r\n");
 	  printf("To download the latest version of ASD archiver just let yourself out\n");
 	  printf("on the Internet world and navigate your navigator to:\n");
@@ -1220,7 +1256,7 @@ int main(int argc, char *argv[])
   //count switches
   for (m=1; m<argc; m++)
     {
-      if (toupper(argv[m][0]=='-'))
+      if ((argv[m][0]=='-') && (argv[m][1]!='\0'))
 	{
 	  switches++;
 	  if (toupper(argv[m][1])=='Y') always=1;

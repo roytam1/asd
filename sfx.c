@@ -101,7 +101,7 @@ int file_exist(char*);
 
 
 
-//don´t forget to free mem too later..
+//don't forget to free mem too later..
 int read_f_archive(void)
 {
   int i,j,c,d;
@@ -159,62 +159,85 @@ int check_file(char *filename)
 {
   int result;
   char *temp_filename;
+  char *asd_filename;
+  int c1,c2,c3;
+
   result=0;
-  temp_filename = (char*) malloc ((sizeof(char)*strlen(filename)) );
+
+  //room for the name + ".asd" + null
+  asd_filename=(char*) malloc (sizeof(char)*(strlen(filename)+6));
+  strcpy(asd_filename,filename);
+
+  //room for the name + null
+  temp_filename = (char*) malloc ((sizeof(char)*(strlen(filename)+1)) );
   strcpy(temp_filename,filename);
 
   if ((infile = fopen(filename,"rb"))==NULL) 
     {
       result=1;
-      strcat(filename,".asd");
-      if ((infile = fopen(filename,"rb"))==NULL) 
+      strcat(asd_filename,".asd");
+      if ((infile = fopen(asd_filename,"rb"))==NULL) 
 	{
-	  tc(RED);printf("File [%s] or [%s.asd] does not exist !\n",temp_filename,temp_filename);tc(NORMAL);
-	  fclose(infile);
-	  //free(filename);
-	  free(temp_filename);
-	  exit(EXIT_FAILURE);
+ 	  tc(RED);printf("File [%s] or [%s.asd] does not exist !\n",temp_filename,temp_filename);tc(NORMAL);
+ 	  free(asd_filename);
+ 	  free(temp_filename);
+ 	  exit(EXIT_FAILURE);
 	}
     }
+  free(asd_filename);
 
-  if ( (_getc(infile)!='A') | (_getc(infile)!='S') | (_getc(infile)!='D')  )
+  //note: the chars must be read one by one, the order of the
+  //evaluation of the operands is not the same in every compiler
+  c1=_getc(infile);
+  c2=_getc(infile);
+  c3=_getc(infile);
+
+  if ( (c1!='A') | (c2!='S') | (c3!='D')  )
     {
       //if file is exe file
       if  (filelength(fileno(infile)) > sfx_data_size)
 	{
 	  fseek(infile,sfx_data_size,SEEK_SET);
-	  if ( (_getc(infile)=='A') && (_getc(infile)=='S') && (_getc(infile)=='D')  )
+	  c1=_getc(infile);
+	  c2=_getc(infile);
+	  c3=_getc(infile);
+	  if ( (c1=='A') && (c2=='S') && (c3=='D')  )
 	    {
-	      if ( (_getc(infile)!='0') | (_getc(infile)!='1') | (_getc(infile)!=26)  )
+	      c1=_getc(infile);
+	      c2=_getc(infile);
+	      c3=_getc(infile);
+	      if ( (c1!='0') | (c2!='1') | (c3!=26)  )
 		{
 		  tc(RED);printf("NOT an ASD 0.1.x archive, please download latest ASD archiver and try again !\n");tc(NORMAL);
 		  fclose(infile);
-		  //free(filename);
 		  free(temp_filename);
 		  exit(EXIT_FAILURE);
 		}
+	      free(temp_filename);
 	      return(result);
 	    }
 	  
 	}
       tc(RED);printf("NOT an ASD archive file !\n");tc(NORMAL);
       fclose(infile);
-      //free(filename);
       free(temp_filename);
       exit(EXIT_FAILURE);
     }
   
-  if ( (_getc(infile)!='0') | (_getc(infile)!='1') | (_getc(infile)!=26)  )
+  c1=_getc(infile);
+  c2=_getc(infile);
+  c3=_getc(infile);
+  if ( (c1!='0') | (c2!='1') | (c3!=26)  )
     {
       tc(RED);printf("NOT an ASD 0.1.x archive, please download latest ASD archiver and try again !\n ");tc(NORMAL);
       fclose(infile);
-      //free(filename);
       free(temp_filename);
       exit(EXIT_FAILURE);
     }
   free(temp_filename);
   return(result);
 }
+
 
 
 
@@ -363,7 +386,7 @@ int extract(char *filename)
   //check files...  
   check_file(filename); 
   
-  tc(YELLOW);printf("þ ");tc(NORMAL);
+  tc(YELLOW);printf("- ");tc(NORMAL);
   if (testa==1)
     printf("\rTesting archive: ");
   else
@@ -440,7 +463,7 @@ int extract(char *filename)
 
   if (errors==0)
     {
-      tc(YELLOW);printf("þ ");tc(NORMAL);printf("All files OK !\n");tc(NORMAL);
+      tc(YELLOW);printf("- ");tc(NORMAL);printf("All files OK !\n");tc(NORMAL);
     }
   else
     {

@@ -21,7 +21,7 @@ int i,j,k,l,m,c;
 
 static unsigned char asd_extra;
 
-//I´ll do this static since it only uses small memmories with a 4k buffer..
+//I'll do this static since it only uses small memmories with a 4k buffer..
 struct
 {
   unsigned int next;
@@ -315,7 +315,10 @@ void encode(unsigned int hash_level_deep, unsigned char asd_extra_value, FILE *i
 	{
 	  fstatus=0;
 	  _gotoxy(0,_wherey());
-	  printf("%ld %% left to compress.     ",(100-(count/(fsize/100))) );
+	  if (fsize>100)
+	    printf("%ld %% left to compress.     ",(100-(count/(fsize/100))) );
+	  else
+	    printf("100 %% left to compress.     ");
 	}
       if (left_in_window<1) break;
     }
@@ -329,12 +332,17 @@ void encode(unsigned int hash_level_deep, unsigned char asd_extra_value, FILE *i
   fflush(infile);
   fflush(outfile);
 
-  tc(YELLOW);printf("þ ");tc(NORMAL);
+  tc(YELLOW);printf("- ");tc(NORMAL);
   printf("infile:%ld     outfile:%ld    ",filelength(fileno(infile)),filelength(fileno(outfile)));
 
   d1=(double) (filelength(fileno(infile)));
   d2=(double) (filelength(fileno(outfile)));
-  d1=d1/10;d2=d2/10;d3=(d1-d2) / (d1/100);
+  d1=d1/10;d2=d2/10;
+
+  if ((d1/100)!=0)
+    d3=(d1-d2) / (d1/100);
+  else
+    d3=0;
 
   printf(" => Saved %.2f%%      ",d3);
   printf("\r\n");
