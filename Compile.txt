@@ -1,0 +1,19 @@
+Complete sources released under GPL2
+
+tested with
+
+with Borland c++ for windows/dos version
+with gnu gcc for Linux version
+
+Linux
+edit asd.h and change define to __UNIX__
+
+
+Windows/Dos
+edit asd.h and change define to __WINDOWS__
+
+
+for more info contact Tobias Svensson
+email: tobiassvensson@home.se
+
+/Tobias
